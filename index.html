@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>太空射擊遊戲</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>太空射擊遊戲</h1>
+    <div id="game-container">
+        <div id="inventory-bar">
+            <div class="inventory-slot"></div>
+            <div class="inventory-slot"></div>
+            <div class="inventory-slot"></div>
+        </div>
+        <canvas id="gameCanvas"></canvas>
+        <div id="game-ui" style="display: none;">
+            <div id="score">分數: 0</div>
+            <div id="lives">生命: 3</div>
+            <div id="health-bar-container">
+                <div id="health-bar"></div>
+            </div>
+        </div>
+        <div id="start-screen" class="overlay">
+            <h2>太空射擊遊戲</h2>
+            <p>移動滑鼠控制方向，左鍵射擊，Q使用手榴彈，空白鍵暫停</p>
+            <h3>按 ENTER 開始</h3>
+        </div>
+        <div id="pause-screen" class="overlay" style="display: none;">
+            <h2>已暫停</h2>
+        </div>
+        <div id="powerup-screen" class="overlay" style="display: none;">
+            <h2>選擇一個能力！</h2>
+            <div id="powerup-options"></div>
+        </div>
+        <div id="game-over-screen" class="overlay" style="display: none;">
+            <h2>遊戲結束</h2>
+            <p>最終分數: <span id="final-score">0</span></p>
+            <button id="restart-button">重新開始</button>
+        </div>
+        <div id="win-screen" class="overlay" style="display: none;">
+            <h2>恭喜獲勝！</h2>
+            <p>你的分數達到了 20000！</p>
+            <button id="continue-button">繼續挑戰 (更高難度)</button>
+            <button id="restart-win-button">重新開始</button>
+        </div>
+        <div id="wave-warning"></div>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>
