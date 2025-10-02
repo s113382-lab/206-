@@ -9,10 +9,15 @@
 <body>
     <h1>太空射擊遊戲</h1>
     <div id="game-container">
-        <div id="inventory-bar">
-            <div class="inventory-slot"></div>
-            <div class="inventory-slot"></div>
-            <div class="inventory-slot"></div>
+        <div id="skill-bar">
+            <div id="grenade-skill" class="skill-slot">
+                <span>Q</span>
+                <div class="cooldown-overlay"></div>
+            </div>
+            <div id="super-skill" class="skill-slot" style="display: none;">
+                <span>F1</span>
+                <div class="cooldown-overlay"></div>
+            </div>
         </div>
         <canvas id="gameCanvas"></canvas>
         <div id="game-ui" style="display: none;">

@@ -97,7 +97,7 @@ canvas {
     background-color: #0f0;
 }
 
-#inventory-bar {
+#skill-bar {
     position: absolute;
     top: 50px;
     left: 10px;
@@ -105,7 +105,7 @@ canvas {
     gap: 10px;
 }
 
-.inventory-slot {
+.skill-slot {
     width: 40px;
     height: 40px;
     border: 2px solid #0ff;
@@ -116,6 +116,26 @@ canvas {
     font-size: 1.5em;
     color: #ff9800;
     font-weight: bold;
+    position: relative; /* Needed for overlay positioning */
+}
+
+.cooldown-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    display: none; /* Hidden by default */
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2em;
+}
+
+#super-skill {
+    border-color: #f0f; /* Purple border */
+    color: #f0f;
 }
 
 #wave-warning {

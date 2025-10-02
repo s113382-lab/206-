@@ -15,7 +15,9 @@ const restartButton = document.getElementById('restart-button');
 const winScreen = document.getElementById('win-screen');
 const continueButton = document.getElementById('continue-button');
 const restartWinButton = document.getElementById('restart-win-button');
-const inventorySlots = document.querySelectorAll('.inventory-slot');
+const cooldownOverlay = document.querySelector('#grenade-skill .cooldown-overlay');
+const superSkillSlot = document.getElementById('super-skill');
+const superSkillCooldownOverlay = document.querySelector('#super-skill .cooldown-overlay');
 const waveWarningEl = document.getElementById('wave-warning');
 
 canvas.width = 800;
@@ -23,7 +25,7 @@ canvas.height = 600;
 
 // Game State Variables
 let mouse = { x: canvas.width / 2, y: canvas.height / 2 };
-let score, lives, gameState, player, bullets, enemies, particles, pickups, obstacles, grenades, meteors;
+let score, lives, gameState, player, bullets, enemies, particles, pickups, obstacles, grenades, meteors, superBombs;
 let scoreIntervalForPowerup, powerupsAwarded;
 let endlessMode;
 let waveInfo;
@@ -56,7 +58,11 @@ class Player {
         this.piercing = false;
         this.tripleShot = false;
         this.activePowerups = [];
-        this.inventory = [];
+        this.grenadeCooldown = 10000; // 10 seconds
+        this.lastGrenadeTime = -10000; // Ready at start
+        this.superSkillUnlocked = false;
+        this.superSkillCooldown = 30000; // 30 seconds
+        this.lastSuperSkillTime = -30000;
     }
     update(deltaTime) {
         const dx = mouse.x - this.x;
@@ -138,12 +144,56 @@ class Enemy { constructor(x, y) { this.x = x; this.y = y; let difficultyMultipli
 class RedEnemy extends Enemy { constructor(x, y) { super(x, y); this.size = 20; this.color = '#f44'; this.scoreValue = 100; } draw() { ctx.fillStyle = this.color; ctx.fillRect(this.x - this.size / 2, this.y - this.size / 2, this.size, this.size); } }
 class YellowEnemy extends Enemy { constructor(x, y) { super(x, y); this.size = 25; this.color = '#ff0'; this.scoreValue = 100; } draw() { ctx.fillStyle = this.color; ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(Math.PI / 4); ctx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size); ctx.restore(); } explode() { for (let i = 0; i < 50; i++) { particles.push(new Particle(this.x, this.y, this.color, Math.random() * 5 + 2)); } const explosionRadius = 100; enemies.forEach(enemy => { if (enemy !== this) { const dist = Math.hypot(this.x - enemy.x, this.y - enemy.y); if (dist < explosionRadius) { enemy.isHit = true; addScore(enemy.scoreValue); for (let i = 0; i < 20; i++) { particles.push(new Particle(enemy.x, enemy.y, enemy.color, Math.random() * 3 + 1)); } } } }); } }
 class Particle { constructor(x, y, color, size) { this.x = x; this.y = y; this.color = color; this.size = size; this.velocity = { x: (Math.random() - 0.5) * 8, y: (Math.random() - 0.5) * 8 }; this.alpha = 1; } update() { this.x += this.velocity.x; this.y += this.velocity.y; this.alpha -= 0.02; } draw() { ctx.save(); ctx.globalAlpha = this.alpha; ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); ctx.restore(); } }
-class Pickup { constructor(x, y, type) { this.x = x; this.y = y; this.type = type; this.size = 10; } draw() { if (this.type === 'grenade') { ctx.fillStyle = '#ff9800'; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#000'; ctx.font = '12px Arial'; ctx.fillText('G', this.x - 4, this.y + 4); } else { ctx.fillStyle = this.type === 'health' ? '#0f0' : '#f00'; ctx.fillRect(this.x - this.size, this.y - this.size / 4, this.size * 2, this.size / 2); ctx.fillRect(this.x - this.size / 4, this.y - this.size, this.size / 2, this.size * 2); } } applyEffect() { if (this.type === 'health') { player.health = Math.min(player.maxHealth, player.health + 25); } else if (this.type === 'poison') { player.takeDamage(25); } else if (this.type === 'grenade') { if (player.inventory.length < 3) { player.inventory.push('grenade'); return true; } return false; } return true; } }
+class Pickup { constructor(x, y, type) { this.x = x; this.y = y; this.type = type; this.size = 10; } draw() { if (this.type === 'grenade') { ctx.fillStyle = '#ff9800'; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#000'; ctx.font = '12px Arial'; ctx.fillText('G', this.x - 4, this.y + 4); } else { ctx.fillStyle = this.type === 'health' ? '#0f0' : '#f00'; ctx.fillRect(this.x - this.size, this.y - this.size / 4, this.size * 2, this.size / 2); ctx.fillRect(this.x - this.size / 4, this.y - this.size, this.size / 2, this.size * 2); } } applyEffect() { if (this.type === 'health') { player.health = Math.min(player.maxHealth, player.health + 25); } else if (this.type === 'poison') { player.takeDamage(25); } return true; } }
 class Grenade { constructor(x, y) { this.x = x; this.y = y; this.timer = 2000; this.radius = 10; } update(deltaTime) { this.timer -= deltaTime; if (this.timer <= 0) { this.explode(); } } draw() { ctx.fillStyle = `rgba(255, 152, 0, ${this.timer / 2000})`; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill(); } explode() { const explosionRadius = 150; for (let i = 0; i < 100; i++) { particles.push(new Particle(this.x, this.y, '#ff9800', Math.random() * 6 + 2)); } for (let i = enemies.length - 1; i >= 0; i--) { const enemy = enemies[i]; const dist = Math.hypot(this.x - enemy.x, this.y - enemy.y); if (dist < explosionRadius) { addScore(enemy.scoreValue); enemies.splice(i, 1); } } } }
 class Obstacle { constructor(x, y, width, height) { this.x = x; this.y = y; this.width = width; this.height = height; } update(deltaTime) {} }
 class PurpleWall extends Obstacle { constructor(x, y, width, height) { super(x, y, width, height); this.health = 100; this.color = '#9400D3'; } takeDamage(amount) { this.health -= amount; } draw() { ctx.fillStyle = this.color; ctx.fillRect(this.x, this.y, this.width, this.height); } }
 class WhiteWall extends Obstacle { constructor(x, y, width, height) { super(x, y, width, height); this.lifetime = 10000; this.color = 'rgba(255, 255, 255, 0.8)'; } update(deltaTime) { this.lifetime -= deltaTime; } draw() { ctx.fillStyle = this.color; ctx.fillRect(this.x, this.y, this.width, this.height); } }
 class Meteor { constructor() { this.x = Math.random() * canvas.width; this.y = -50; this.size = Math.random() * 30 + 10; this.speed = Math.random() * 3 + 2; } update() { this.y += this.speed; } draw() { ctx.fillStyle = '#a52a2a'; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); } }
+
+class SuperBomb {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.timer = 3000; // 3 second fuse
+        this.radius = 20;
+    }
+    update(deltaTime) {
+        this.timer -= deltaTime;
+        if (this.timer <= 0) {
+            this.explode();
+        }
+    }
+    draw() {
+        ctx.fillStyle = `rgba(255, 0, 255, ${this.timer / 3000})`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    explode() {
+        const explosionRadius = 300; // Much larger radius
+        for (let i = 0; i < 250; i++) {
+            particles.push(new Particle(this.x, this.y, '#f0f', Math.random() * 8 + 3));
+        }
+        for (let i = enemies.length - 1; i >= 0; i--) {
+            const enemy = enemies[i];
+            const dist = Math.hypot(this.x - enemy.x, this.y - enemy.y);
+            if (dist < explosionRadius) {
+                addScore(enemy.scoreValue);
+                enemies.splice(i, 1);
+            }
+        }
+         for (let i = obstacles.length - 1; i >= 0; i--) {
+            const obstacle = obstacles[i];
+            const obsCenterX = obstacle.x + obstacle.width / 2;
+            const obsCenterY = obstacle.y + obstacle.height / 2;
+            const dist = Math.hypot(this.x - obsCenterX, this.y - obsCenterY);
+             if (dist < explosionRadius) {
+                obstacles.splice(i, 1);
+            }
+        }
+    }
+}
 
 // --- FUNCTIONS ---
 
@@ -154,7 +204,7 @@ function init() {
     scoreIntervalForPowerup = 1000;
     powerupsAwarded = 0; // BUGFIX: Initialize counter
     player = new Player();
-    bullets = []; enemies = []; particles = []; pickups = []; obstacles = []; grenades = []; meteors = [];
+    bullets = []; enemies = []; particles = []; pickups = []; obstacles = []; grenades = []; meteors = []; superBombs = [];
     waveInfo = { w5ktriggered: false, w6ktriggered: false, lastWaveTime: 0, warningActive: false, warningText: '', warningTimer: 0 };
     if (stars.length === 0) createStars();
     setGameState('start');
@@ -184,6 +234,11 @@ function setGameState(newState) {
 function addScore(value) {
     if (gameState !== 'playing') return;
     score += value;
+
+    if (score >= 5000 && !player.superSkillUnlocked) {
+        player.superSkillUnlocked = true;
+    }
+
     if (score >= 20000 && !endlessMode) {
         setGameState('won');
         return;
@@ -267,8 +322,7 @@ function spawnPickup() {
     const rand = Math.random();
     let type;
     const poisonChance = endlessMode ? 0.4 : 0.2;
-    if (rand < 0.1) { type = 'grenade'; }
-    else if (rand < 0.1 + poisonChance) { type = 'poison'; }
+    if (rand < poisonChance) { type = 'poison'; } // Adjusted chances
     else { type = 'health'; }
     pickups.push(new Pickup(x, y, type));
 }
@@ -297,13 +351,36 @@ function updateUI() {
     livesEl.textContent = `生命: ${lives}`;
     healthBar.style.width = `${(player.health / player.maxHealth) * 100}%`;
     healthBar.style.backgroundColor = player.health > 50 ? '#0f0' : player.health > 25 ? '#ff0' : '#f00';
-    updateInventoryUI();
+    updateSkillUI();
 }
 
-function updateInventoryUI() {
-    inventorySlots.forEach((slot, index) => {
-        slot.textContent = player.inventory[index] === 'grenade' ? 'G' : '';
-    });
+function updateSkillUI() {
+    const now = Date.now();
+
+    // Grenade Cooldown
+    const timeSinceGrenade = now - player.lastGrenadeTime;
+    if (timeSinceGrenade < player.grenadeCooldown) {
+        cooldownOverlay.style.display = 'flex';
+        const timeLeft = ((player.grenadeCooldown - timeSinceGrenade) / 1000).toFixed(1);
+        cooldownOverlay.textContent = timeLeft;
+    } else {
+        cooldownOverlay.style.display = 'none';
+    }
+
+    // Super Skill UI
+    if (player.superSkillUnlocked) {
+        superSkillSlot.style.display = 'flex';
+        const timeSinceSuperSkill = now - player.lastSuperSkillTime;
+        if (timeSinceSuperSkill < player.superSkillCooldown) {
+            superSkillCooldownOverlay.style.display = 'flex';
+            const timeLeft = ((player.superSkillCooldown - timeSinceSuperSkill) / 1000).toFixed(1);
+            superSkillCooldownOverlay.textContent = timeLeft;
+        } else {
+            superSkillCooldownOverlay.style.display = 'none';
+        }
+    } else {
+        superSkillSlot.style.display = 'none';
+    }
 }
 
 function drawWaveWarning(deltaTime) {
@@ -401,6 +478,7 @@ function gameLoop(timestamp) {
         particles.forEach(p => p.update());
         obstacles.forEach(o => o.update(deltaTime));
         grenades.forEach(g => g.update(deltaTime));
+        superBombs.forEach(s => s.update(deltaTime));
         meteors.forEach(m => m.update());
 
         enemySpawnTimer += deltaTime;
@@ -422,6 +500,7 @@ function gameLoop(timestamp) {
         particles = particles.filter(p => p.alpha > 0);
         obstacles = obstacles.filter(o => !(o.lifetime && o.lifetime <= 0) && !(o.health && o.health <= 0));
         grenades = grenades.filter(g => g.timer > 0);
+        superBombs = superBombs.filter(s => s.timer > 0);
         meteors = meteors.filter(m => m.y < canvas.height + 50);
     }
 
@@ -434,6 +513,7 @@ function gameLoop(timestamp) {
     enemies.forEach(e => e.draw());
     particles.forEach(p => p.draw());
     grenades.forEach(g => g.draw());
+    superBombs.forEach(s => s.draw());
     meteors.forEach(m => m.draw());
 
     if (gameState === 'playing') updateUI();
@@ -443,9 +523,18 @@ function gameLoop(timestamp) {
 }
 
 function useGrenade() {
-    if (player.inventory.length > 0 && gameState === 'playing') {
-        player.inventory.pop();
+    const now = Date.now();
+    if (gameState === 'playing' && now - player.lastGrenadeTime > player.grenadeCooldown) {
+        player.lastGrenadeTime = now;
         grenades.push(new Grenade(player.x, player.y));
+    }
+}
+
+function useSuperSkill() {
+    const now = Date.now();
+    if (gameState === 'playing' && player.superSkillUnlocked && now - player.lastSuperSkillTime > player.superSkillCooldown) {
+        player.lastSuperSkillTime = now;
+        superBombs.push(new SuperBomb(player.x, player.y));
     }
 }
 
@@ -493,6 +582,10 @@ window.addEventListener('keydown', e => {
     }
     if (e.code === 'KeyQ' && gameState === 'playing') {
         useGrenade();
+    }
+    if (e.code === 'F1') {
+        e.preventDefault();
+        useSuperSkill();
     }
 });
 
